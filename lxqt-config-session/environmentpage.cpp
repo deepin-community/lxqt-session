@@ -29,6 +29,7 @@
 #include "ui_environmentpage.h"
 
 #include <LXQt/Globals>
+#include <QHeaderView>
 
 EnvironmentPage::EnvironmentPage(LXQt::Settings *settings, QWidget *parent) :
     QWidget(parent),
@@ -37,10 +38,12 @@ EnvironmentPage::EnvironmentPage(LXQt::Settings *settings, QWidget *parent) :
 {
     ui->setupUi(this);
 
-    connect(ui->addButton, SIGNAL(clicked()), SLOT(addButton_clicked()));
-    connect(ui->deleteButton, SIGNAL(clicked()), SLOT(deleteButton_clicked()));
-    connect(ui->treeWidget, SIGNAL(itemChanged(QTreeWidgetItem*,int)),
-            SLOT(itemChanged(QTreeWidgetItem*,int)));
+    // give enough space to the first section of the header
+    ui->treeWidget->header()->resizeSection(0, ui->treeWidget->header()->sectionSizeHint(0));
+
+    connect(ui->addButton,    &QPushButton::clicked,     this, &EnvironmentPage::addButton_clicked);
+    connect(ui->deleteButton, &QPushButton::clicked,     this, &EnvironmentPage::deleteButton_clicked);
+    connect(ui->treeWidget,   &QTreeWidget::itemChanged, this, &EnvironmentPage::itemChanged);
 
     /* restoreSettings() is called from SessionConfigWindow
        after connections with DefaultApps have been set up */
@@ -81,7 +84,7 @@ void EnvironmentPage::save()
 
     m_settings->beginGroup(QL1S("Environment"));
 
-    /* We erase the Enviroment group and them write the Ui settings. To know if
+    /* We erase the Environment group and then write the UI settings. To know if
        they changed or not we need to save them to memory.
      */
     const auto keys = m_settings->childKeys();
@@ -153,3 +156,12 @@ void EnvironmentPage::updateItem(const QString& var, const QString& val)
             delete item;
     }
 }
+
+void EnvironmentPage::updateScaleFactor()
+{
+    m_settings->beginGroup(QL1S("Environment"));
+    updateItem(QL1S("QT_SCALE_FACTOR"), m_settings->value(QL1S("QT_SCALE_FACTOR"), 1).toString());
+    updateItem(QL1S("GDK_SCALE"), m_settings->value(QL1S("GDK_SCALE"), 1).toString());
+    m_settings->endGroup();
+}
+

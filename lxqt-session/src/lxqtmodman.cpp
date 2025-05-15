@@ -33,7 +33,7 @@
 #include <XdgDirs>
 #include <unistd.h>
 
-#include <QCoreApplication>
+#include <QApplication>
 #include <QMessageBox>
 #include <QSystemTrayIcon>
 #include <QFileInfo>
@@ -41,15 +41,14 @@
 #include <QDir>
 #include <QFileSystemWatcher>
 #include <QDateTime>
+#include <QPointer>
 #include "wmselectdialog.h"
 #include "windowmanager.h"
 #include <wordexp.h>
 #include "log.h"
 
-#include <KWindowSystem/KWindowSystem>
-#include <KWindowSystem/netwm.h>
-
-#include <QX11Info>
+#include <KWindowSystem>
+#include <NETWM>
 
 #define MAX_CRASHES_PER_APP 5
 
@@ -61,15 +60,12 @@ using namespace LXQt;
 LXQtModuleManager::LXQtModuleManager(QObject* parent)
     : QObject(parent),
       mWmProcess(new QProcess(this)),
-      mThemeWatcher(new QFileSystemWatcher(this)),
-      mWmStarted(false),
-      mTrayStarted(false),
-      mWaitLoop(nullptr)
+      mThemeWatcher(new QFileSystemWatcher(this))
 {
-    connect(mThemeWatcher, SIGNAL(directoryChanged(QString)), SLOT(themeFolderChanged(QString)));
-    connect(LXQt::Settings::globalSettings(), SIGNAL(lxqtThemeChanged()), SLOT(themeChanged()));
+    connect(mThemeWatcher, &QFileSystemWatcher::directoryChanged, this, &LXQtModuleManager::themeFolderChanged);
+    connect(LXQt::Settings::globalSettings(), &LXQt::GlobalSettings::lxqtThemeChanged, this, &LXQtModuleManager::themeChanged);
 
-    qApp->installNativeEventFilter(this);
+    mProcReaper.start();
 }
 
 void LXQtModuleManager::setWindowManager(const QString & windowManager)
@@ -83,7 +79,8 @@ void LXQtModuleManager::startup(LXQt::Settings& s)
     startConfUpdate();
 
     // Start window manager
-    startWm(&s);
+    if (QGuiApplication::platformName() == QStringLiteral("xcb"))
+        startWm(&s);
 
     startAutostartApps();
 
@@ -91,7 +88,7 @@ void LXQtModuleManager::startup(LXQt::Settings& s)
     paths << XdgDirs::dataHome(false);
     paths << XdgDirs::dataDirs();
 
-    for(const QString &path : qAsConst(paths))
+    for(const QString &path : std::as_const(paths))
     {
         QFileInfo fi(QString::fromLatin1("%1/lxqt/themes").arg(path));
         if (fi.exists())
@@ -106,8 +103,13 @@ void LXQtModuleManager::startAutostartApps()
     // XDG autostart
     const XdgDesktopFileList fileList = XdgAutoStart::desktopFileList();
     QList<const XdgDesktopFile*> trayApps;
+    bool isWayland((QGuiApplication::platformName() == QLatin1String("wayland")));
     for (XdgDesktopFileList::const_iterator i = fileList.constBegin(); i != fileList.constEnd(); ++i)
     {
+        if (isWayland && i->value(QSL("X-LXQt-X11-Only"), false).toBool())
+        {
+            continue;
+        }
         if (i->value(QSL("X-LXQt-Need-Tray"), false).toBool())
             trayApps.append(&(*i));
         else
@@ -119,21 +121,33 @@ void LXQtModuleManager::startAutostartApps()
 
     if (!trayApps.isEmpty())
     {
-        mTrayStarted = QSystemTrayIcon::isSystemTrayAvailable();
-        if(!mTrayStarted)
-        {
-            QEventLoop waitLoop;
-            mWaitLoop = &waitLoop;
-            // add a timeout to avoid infinite blocking if a WM fail to execute.
-            QTimer::singleShot(60 * 1000, &waitLoop, SLOT(quit()));
-            waitLoop.exec();
-            mWaitLoop = nullptr;
-        }
-        for (const XdgDesktopFile* const f : qAsConst(trayApps))
-        {
-            qCDebug(SESSION) << "start tray app" << f->fileName();
-            startProcess(*f);
-        }
+        QPointer<QTimer> t{new QTimer};
+        auto starter = [this, fileList, trayApps, t] (const bool forceStart = false) {
+            if (!t)
+                return;
+
+            if (QSystemTrayIcon::isSystemTrayAvailable())
+                qCDebug(SESSION) << "System Tray started";
+            else if (forceStart)
+                qCWarning(SESSION) << "System Tray haven't stared yet! Starting tray apps anyway...";
+            else
+                return;
+
+            QScopedPointer<QTimer> releaser{t};
+            for (const XdgDesktopFile* const f : std::as_const(trayApps))
+            {
+                qCDebug(SESSION) << "start tray app" << f->fileName();
+                startProcess(*f);
+            }
+            t->stop();
+        };
+        connect(t, &QTimer::timeout, this, starter);
+        t->setSingleShot(false);
+        t->start(1000);
+        // try to start instantly, no need to wait the 1st sec
+        starter();
+        // start the apps anyway after a timeout
+        QTimer::singleShot(15 * 1000, this, std::bind(starter, true));
     }
 }
 
@@ -179,10 +193,11 @@ void LXQtModuleManager::startWm(LXQt::Settings *settings)
 {
     // if the WM is active do not run WM.
     // all window managers must set their name according to the spec
-    if (!QString::fromUtf8(NETRootInfo(QX11Info::connection(), NET::SupportingWMCheck).wmName()).isEmpty())
-    {
-        mWmStarted = true;
-        return;
+    if (auto x11NativeInterface = qGuiApp->nativeInterface<QNativeInterface::QX11Application>()) {
+        if (!QString::fromUtf8(NETRootInfo(x11NativeInterface->connection(), NET::SupportingWMCheck).wmName()).isEmpty())
+        {
+            return;
+        }
     }
 
     if (mWindowManager.isEmpty())
@@ -198,27 +213,30 @@ void LXQtModuleManager::startWm(LXQt::Settings *settings)
         settings->sync();
     }
 
-    if (QFileInfo(mWindowManager).baseName() == QL1S("openbox"))
-    {
-        // Default settings of openbox are copied by lxqt-session/startlxqt.in
-        QString openboxSettingsPath = XdgDirs::configHome() + QSL("/openbox/lxqt-rc.xml");
-        QStringList args;
-        if(QFileInfo::exists(openboxSettingsPath))
-            args << QSL("--config-file") << openboxSettingsPath;
-        mWmProcess->start(mWindowManager, args);
-    }
-    else
-        mWmProcess->start(mWindowManager, QStringList());
-    
+    mWmProcess->start(mWindowManager, QStringList());
+
     // other autostart apps will be handled after the WM becomes available
 
     // Wait until the WM loads
     QEventLoop waitLoop;
-    mWaitLoop = &waitLoop;
+    auto checker = [&waitLoop] {
+        // all window managers must set their name according to the spec
+        if (auto x11NativeInterface = qGuiApp->nativeInterface<QNativeInterface::QX11Application>()) {
+            if (!QString::fromUtf8(NETRootInfo(x11NativeInterface->connection(), NET::SupportingWMCheck).wmName()).isEmpty())
+            {
+                qCDebug(SESSION) << "Window Manager started";
+                waitLoop.exit();
+            }
+        }
+    };
+    QTimer t;
+    connect(&t, &QTimer::timeout, this, checker);
+    t.setSingleShot(false);
+    t.start(500);
     // add a timeout to avoid infinite blocking if a WM fail to execute.
-    QTimer::singleShot(30 * 1000, &waitLoop, SLOT(quit()));
+    QTimer::singleShot(30 * 1000, &waitLoop, &QEventLoop::quit);
+    // Note: the timer object is destructed sooner than the wait loop upon finishing this method
     waitLoop.exec();
-    mWaitLoop = nullptr;
     // FIXME: blocking is a bad idea. We need to start as many apps as possible and
     //         only wait for the start of WM when it's absolutely needed.
     //         Maybe we can add a X-Wait-WM=true key in the desktop entry file?
@@ -238,14 +256,13 @@ void LXQtModuleManager::startProcess(const XdgDesktopFile& file)
         return;
     }
     LXQtModule* proc = new LXQtModule(file, this);
-    connect(proc, SIGNAL(moduleStateChanged(QString,bool)), this, SIGNAL(moduleStateChanged(QString,bool)));
+    connect(proc, &LXQtModule::moduleStateChanged, this, &LXQtModuleManager::moduleStateChanged);
     proc->start();
 
     QString name = QFileInfo(file.fileName()).fileName();
     mNameMap[name] = proc;
 
-    connect(proc, SIGNAL(finished(int, QProcess::ExitStatus)),
-            this, SLOT(restartModules(int, QProcess::ExitStatus)));
+    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, &LXQtModuleManager::restartModules);
 }
 
 void LXQtModuleManager::startProcess(const QString& name)
@@ -283,7 +300,7 @@ void LXQtModuleManager::startConfUpdate()
     startProcess(desktop);
 }
 
-void LXQtModuleManager::restartModules(int /*exitCode*/, QProcess::ExitStatus exitStatus)
+void LXQtModuleManager::restartModules(int exitCode, QProcess::ExitStatus exitStatus)
 {
     LXQtModule* proc = qobject_cast<LXQtModule*>(sender());
     if (nullptr == proc) {
@@ -297,8 +314,10 @@ void LXQtModuleManager::restartModules(int /*exitCode*/, QProcess::ExitStatus ex
         switch (exitStatus)
         {
             case QProcess::NormalExit:
-                qCDebug(SESSION) << "Process" << procName << "(" << proc << ") exited correctly.";
-                break;
+                qCDebug(SESSION) << "Process" << procName << "(" << proc << ") exited with code" << exitCode;
+                if (exitCode == 0)
+                    break;
+                // Falls through.
             case QProcess::CrashExit:
             {
                 qCDebug(SESSION) << "Process" << procName << "(" << proc << ") has to be restarted";
@@ -327,11 +346,9 @@ void LXQtModuleManager::restartModules(int /*exitCode*/, QProcess::ExitStatus ex
 
 LXQtModuleManager::~LXQtModuleManager()
 {
-    qApp->removeNativeEventFilter(this);
-
     // We disconnect the finished signal before deleting the process. We do
     // this to prevent a crash that results from a state change signal being
-    // emmited while deleting a crashing module.
+    // emitted while deleting a crashing module.
     // If the module is still connect restartModules will be called with a
     // invalid sender.
 
@@ -341,7 +358,7 @@ LXQtModuleManager::~LXQtModuleManager()
         i.next();
 
         auto p = i.value();
-        disconnect(p, SIGNAL(finished(int, QProcess::ExitStatus)), nullptr, nullptr);
+        disconnect(p);
 
         delete p;
         mNameMap[i.key()] = nullptr;
@@ -376,6 +393,9 @@ void LXQtModuleManager::logout(bool doExit)
         }
     }
 
+    // terminate all possible children except WM
+    mProcReaper.stop({mWmProcess->processId()});
+
     mWmProcess->terminate();
     if (mWmProcess->state() != QProcess::NotRunning && !mWmProcess->waitForFinished(2000))
     {
@@ -403,53 +423,31 @@ void LXQtModuleManager::resetCrashReport()
     mCrashReport.clear();
 }
 
-bool LXQtModuleManager::nativeEventFilter(const QByteArray & eventType, void * /*message*/, long * /*result*/)
-{
-    if (eventType != "xcb_generic_event_t") // We only want to handle XCB events
-        return false;
-
-    if(!mWmStarted && mWaitLoop)
-    {
-        // all window managers must set their name according to the spec
-        if (!QString::fromUtf8(NETRootInfo(QX11Info::connection(), NET::SupportingWMCheck).wmName()).isEmpty())
-        {
-            qCDebug(SESSION) << "Window Manager started";
-            mWmStarted = true;
-            if (mWaitLoop->isRunning())
-                mWaitLoop->exit();
-        }
-    }
-
-    if (!mTrayStarted && QSystemTrayIcon::isSystemTrayAvailable() && mWaitLoop)
-    {
-        qCDebug(SESSION) << "System Tray started";
-        mTrayStarted = true;
-        if (mWaitLoop->isRunning())
-            mWaitLoop->exit();
-
-        // window manager and system tray have started
-        qApp->removeNativeEventFilter(this);
-    }
-
-    return false;
-}
-
 void lxqt_setenv(const char *env, const QByteArray &value)
 {
     wordexp_t p;
-    wordexp(value.constData(), &p, 0);
-    if (p.we_wordc == 1)
-    {
 
-        qCDebug(SESSION) << "Environment variable" << env << "=" << p.we_wordv[0];
-        qputenv(env, p.we_wordv[0]);
-    }
-    else
+    switch (wordexp(value.constData(), &p, 0))
     {
-        qCWarning(SESSION) << "Error expanding environment variable" << env << "=" << value;
-        qputenv(env, value);
+    case 0:
+        if (p.we_wordc == 1)
+        {
+            qCDebug(SESSION) << "Environment variable" << env << "=" << p.we_wordv[0];
+            qputenv(env, p.we_wordv[0]);
+            wordfree(&p);
+            return;
+        }
+        wordfree(&p);
+        break;
+    case WRDE_NOSPACE:
+        // wordfree needed: https://www.gnu.org/software/libc/manual/html_node/Wordexp-Example.html
+        wordfree(&p);
+        break;
+    default:
+        break;
     }
-     wordfree(&p);
+    qCWarning(SESSION) << "Error expanding environment variable" << env << "=" << value;
+    qputenv(env, value);
 }
 
 void lxqt_setenv_prepend(const char *env, const QByteArray &value, const QByteArray &separator)
@@ -468,7 +466,7 @@ LXQtModule::LXQtModule(const XdgDesktopFile& file, QObject* parent) :
     mIsTerminating(false)
 {
     QProcess::setProcessChannelMode(QProcess::ForwardedChannels);
-    connect(this, SIGNAL(stateChanged(QProcess::ProcessState)), SLOT(updateState(QProcess::ProcessState)));
+    connect(this, &LXQtModule::stateChanged, this, &LXQtModule::updateState);
 }
 
 void LXQtModule::start()

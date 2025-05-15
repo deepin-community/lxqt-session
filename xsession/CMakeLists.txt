@@ -4,6 +4,7 @@ file(GLOB SESSION_FILES_IN *.desktop.in)
 lxqt_translate_desktop(SESSION_FILES
     SOURCES
         ${SESSION_FILES_IN}
+    USE_YAML
 )
 add_custom_target(xsession_desktop_files ALL DEPENDS ${SESSION_FILES})
 #************************************************
@@ -17,4 +18,4 @@ MACRO(INSTALL_SESSION_FILES directory)
 ENDMACRO(INSTALL_SESSION_FILES)
 
 INSTALL_SESSION_FILES("${CMAKE_INSTALL_DATAROOTDIR}/xsessions")
-INSTALL_SESSION_FILES("${CMAKE_INSTALL_DATAROOTDIR}/kdm/sessions")
+

@@ -4,12 +4,12 @@
 <context>
     <name>LXQtModuleManager</name>
     <message>
-        <location filename="../src/lxqtmodman.cpp" line="311"/>
+        <location filename="../src/lxqtmodman.cpp" line="330"/>
         <source>Crash Report</source>
         <translation>Kaatumisraportti</translation>
     </message>
     <message>
-        <location filename="../src/lxqtmodman.cpp" line="312"/>
+        <location filename="../src/lxqtmodman.cpp" line="331"/>
         <source>&lt;b&gt;%1&lt;/b&gt; crashed too many times. Its autorestart has been disabled until next login.</source>
         <translation>&lt;b&gt;%1&lt;/b&gt; on kaatunut liian monta kertaa ja sen automaattinen uudelleenkäynnistyminen on poistettu käytöstä seuraavaan kirjautumiseen asti.</translation>
     </message>
@@ -32,6 +32,16 @@
         <source>Window manager to use.</source>
         <translation>Ikkunamanageri.</translation>
     </message>
+    <message>
+        <location filename="../src/sessionapplication.cpp" line="82"/>
+        <source>DBus Environment</source>
+        <translation>DBus-ympäristö</translation>
+    </message>
+    <message>
+        <location filename="../src/sessionapplication.cpp" line="83"/>
+        <source>The DBus Activation Environment wasn&apos;t updated. Some apps might not work properly</source>
+        <translation>DBus-aktivointiympäristöä ei päivitetty. Jotkut sovellukset eivät välttämättä toimi oikein</translation>
+    </message>
 </context>
 <context>
     <name>WmSelectDialog</name>
@@ -48,7 +58,7 @@
     <message>
         <location filename="../src/wmselectdialog.cpp" line="66"/>
         <source>Choose your favorite one.</source>
-        <translation>Valitse suosikkisi,</translation>
+        <translation>Valitse suosikkisi.</translation>
     </message>
     <message>
         <location filename="../src/wmselectdialog.ui" line="20"/>
@@ -58,7 +68,7 @@
     <message>
         <location filename="../src/wmselectdialog.ui" line="71"/>
         <source>You will be able to change this at any time through Preferences -&gt; Session Settings -&gt; Basic Settings.</source>
-        <translation>Voit muuttaa asetusta päävalikon kohteesta Asetukset &gt; LXQt-asetukset &gt; Istuntoasetukset &gt; Perusasetukset</translation>
+        <translation>Voit muuttaa asetusta päävalikon kohteesta Asetukset &gt; LXQt-asetukset &gt; Istuntoasetukset &gt; Perusasetukset.</translation>
     </message>
 </context>
 </TS>

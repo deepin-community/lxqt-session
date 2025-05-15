@@ -1,0 +1,12 @@
+Description: Provides an lxqt-portals.conf for xdg-desktop-portal
+ xdg-desktop-portal 1.17.x introduced a new way to select which portals will 
+ be used for which desktop environments. This patch adds the required 
+ lxqt-portals.conf file
+Forwarded: no
+Bug-Debian:https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1050804
+Author: S.7 <severusseptimius7@gmail.com>
+--- /dev/null
++++ b/config/lxqt-portals.conf
+@@ -0,0 +1,2 @@
++[preferred]
++default=lxqt;gtk;

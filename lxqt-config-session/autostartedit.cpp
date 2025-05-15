@@ -29,7 +29,7 @@
 
 #include <LXQt/Globals>
 
-AutoStartEdit::AutoStartEdit(QString name, QString command, bool needTray, QWidget *parent) :
+AutoStartEdit::AutoStartEdit(const QString& name, const QString& command, bool needTray, bool x11Only, QWidget *parent) :
     QDialog(parent),
     ui(new Ui::AutoStartEdit)
 {
@@ -38,22 +38,28 @@ AutoStartEdit::AutoStartEdit(QString name, QString command, bool needTray, QWidg
     ui->nameEdit->setText(name);
     ui->commandEdit->setText(command);
     ui->trayCheckBox->setChecked(needTray);
-    connect(ui->browseButton, SIGNAL(clicked()), SLOT(browse()));
+    ui->x11CheckBox->setChecked(x11Only);
+    connect(ui->browseButton, &QPushButton::clicked, this, &AutoStartEdit::browse);
 }
 
-QString AutoStartEdit::name()
+QString AutoStartEdit::name() const
 {
     return ui->nameEdit->text();
 }
 
-QString AutoStartEdit::command()
+QString AutoStartEdit::command() const
 {
     return ui->commandEdit->text();
 }
 
-bool AutoStartEdit::needTray()
+bool AutoStartEdit::needTray() const
 {
     return ui->trayCheckBox->isChecked();
+}
+
+bool AutoStartEdit::x11Only() const
+{
+    return ui->x11CheckBox->isChecked();
 }
 
 void AutoStartEdit::browse()

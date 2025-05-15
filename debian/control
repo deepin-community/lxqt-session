@@ -1,43 +1,47 @@
 Source: lxqt-session
-Maintainer: LXQt Packaging Team <pkg-lxqt-devel@lists.alioth.debian.org>
-Uploaders: Alf Gaida <agaida@siduction.org>,
-           ChangZhuo Chen (陳昌倬) <czchen@debian.org>,
+Maintainer: LXQt Packaging Team <team+lxqt@tracker.debian.org>
+Uploaders: ChangZhuo Chen (陳昌倬) <czchen@debian.org>,
            Andrew Lee (李健秋) <ajqlee@debian.org>
 Section: x11
 Priority: optional
-Build-Depends: debhelper-compat (= 12),
-               libkf5windowsystem-dev,
-               liblxqt0-dev (>= 0.16.0~),
-               libqt5svg5-dev,
-               libqt5x11extras5-dev,
+Build-Depends: debhelper-compat (= 13),
+               libglib2.0-dev,
+               libkf6windowsystem-dev,
+               liblayershellqtinterface-dev (>= 6.0.0~),
+               liblxqt-dev (>= 2.1.0~),
+               libproc2-dev,
                libudev-dev [linux-any],
                libx11-dev,
+               qt6-svg-dev,
+               qt6-tools-dev,
+               qtxdg-tools (>= 4.1.0~),
                xdg-user-dirs
-Standards-Version: 4.4.0
+Standards-Version: 4.7.0
 Vcs-Browser: https://salsa.debian.org/lxqt-team/lxqt-session
 Vcs-Git: https://salsa.debian.org/lxqt-team/lxqt-session.git
 Homepage: https://github.com/lxqt/lxqt-session
+Rules-Requires-Root: no
 
 Package: lxqt-session
 Architecture: any
-Depends: ${misc:Depends},
-         ${shlibs:Depends},
-         lxqt-themes | lxqt-theme,
-         lxqt-qtplugin,
-         x11-xkb-utils
-Recommends: lxqt-session-l10n,
-            lxqt-config,
+Depends: lxqt-qtplugin (>= 2.0.0~),
+         lxqt-themes,
+         x11-xkb-utils,
+         ${misc:Depends},
+         ${shlibs:Depends}
+Recommends: lxqt-config,
             lxqt-notificationd,
             lxqt-policykit,
             lxqt-powermanagement,
+            lxqt-session-l10n,
             lxqt-sudo,
             pcmanfm-qt,
             qlipper,
             qps [linux-any],
-            xscreensaver | gnome-screensaver | light-locker | i3lock | suckless-tools
+            xdg-desktop-portal-lxqt,
+            xscreensaver | light-locker | i3lock | suckless-tools
 Provides: x-session-manager
-Breaks: lxqt-common (<< 0.12.0)
-Replaces: lxqt-common (<< 0.12.0)
+Breaks: xdg-desktop-portal-lxqt (<< 1.1.0~)
 Description: session manager component for LXQt
  LXQt is an advanced, easy-to-use, and fast desktop environment based on
  Qt technologies.  It has been tailored for users who value simplicity,
@@ -50,9 +54,8 @@ Package: lxqt-session-l10n
 Architecture: all
 Multi-Arch: foreign
 Section: localization
-Depends: ${misc:Depends},
-         qttranslations5-l10n
-Breaks: lxqt-session (<< 0.11.0)
-Replaces: lxqt-session (<< 0.11.0)
+Depends: qt6-translations-l10n, ${misc:Depends}
 Description: Language package for lxqt-session
- This package contains the l10n files needed by the lxqt-session.
+ The l10n files for lxqt-session.
+ .
+ This package contains the l10n files needed by lxqt-session.
