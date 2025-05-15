@@ -38,9 +38,9 @@ AutoStartPage::AutoStartPage(QWidget* parent) :
 {
     ui->setupUi(this);
 
-    connect(ui->addButton, SIGNAL(clicked()), SLOT(addButton_clicked()));
-    connect(ui->editButton, SIGNAL(clicked()), SLOT(editButton_clicked()));
-    connect(ui->deleteButton, SIGNAL(clicked()), SLOT(deleteButton_clicked()));
+    connect(ui->addButton,    &QPushButton::clicked, this, &AutoStartPage::addButton_clicked);
+    connect(ui->editButton,   &QPushButton::clicked, this, &AutoStartPage::editButton_clicked);
+    connect(ui->deleteButton, &QPushButton::clicked, this, &AutoStartPage::deleteButton_clicked);
 
     restoreSettings();
 }
@@ -59,9 +59,8 @@ void AutoStartPage::restoreSettings()
     ui->autoStartView->setExpanded(mXdgAutoStartModel->index(0, 0), true);
     ui->autoStartView->setExpanded(mXdgAutoStartModel->index(1, 0), true);
     updateButtons();
-    connect(mXdgAutoStartModel, SIGNAL(dataChanged(QModelIndex,QModelIndex)), SLOT(updateButtons()));
-    connect(ui->autoStartView->selectionModel(), SIGNAL(currentChanged(QModelIndex,QModelIndex)),
-            SLOT(selectionChanged(QModelIndex)));
+    connect(mXdgAutoStartModel, &AutoStartItemModel::dataChanged, this, &AutoStartPage::updateButtons);
+    connect(ui->autoStartView->selectionModel(), &QItemSelectionModel::currentChanged, this, &AutoStartPage::selectionChanged);
 }
 
 void AutoStartPage::save()
@@ -129,14 +128,23 @@ void AutoStartPage::save()
 
 void AutoStartPage::addButton_clicked()
 {
-    AutoStartEdit edit(QString(), QString(), false);
+    AutoStartEdit edit(QString(), QString(), false, false);
     bool success = false;
     while (!success && edit.exec() == QDialog::Accepted)
     {
+        const auto trimmedName = edit.name().trimmed();
+        const auto trimmedCommand = edit.command().trimmed();
         QModelIndex index = ui->autoStartView->selectionModel()->currentIndex();
-        XdgDesktopFile file(XdgDesktopFile::ApplicationType, edit.name(), edit.command());
+        if (trimmedName.isEmpty() || trimmedCommand.isEmpty() )
+        {
+            QMessageBox::critical(this, tr("Error"), tr("Please provide Name and Command"));
+            continue;
+        }
+        XdgDesktopFile file(XdgDesktopFile::ApplicationType, trimmedName, trimmedCommand);
         if (edit.needTray())
             file.setValue(QL1S("X-LXQt-Need-Tray"), true);
+        if (edit.x11Only())
+            file.setValue(QL1S("X-LXQt-X11-Only"), true);
         if (mXdgAutoStartModel->setEntry(index, file))
             success = true;
         else
@@ -148,17 +156,35 @@ void AutoStartPage::editButton_clicked()
 {
     QModelIndex index = ui->autoStartView->selectionModel()->currentIndex();
     XdgDesktopFile file = mXdgAutoStartModel->desktopFile(index);
-    AutoStartEdit edit(file.name(), file.value(QL1S("Exec")).toString(), file.contains(QL1S("X-LXQt-Need-Tray")));
-    if (edit.exec() == QDialog::Accepted)
+    AutoStartEdit edit(file.name(),
+                       file.value(QL1S("Exec")).toString(),
+                       file.value(QL1S("X-LXQt-Need-Tray"), false).toBool(),
+                       file.value(QL1S("X-LXQt-X11-Only"), false).toBool());
+    bool success = false;
+    while (!success && edit.exec() == QDialog::Accepted)
     {
-        file.setLocalizedValue(QL1S("Name"), edit.name());
-        file.setValue(QL1S("Exec"), edit.command());
+        const auto trimmedName = edit.name().trimmed();
+        const auto trimmedCommand = edit.command().trimmed();
+        if (trimmedName.isEmpty() || trimmedCommand.isEmpty() )
+        {
+            QMessageBox::critical(this, tr("Error"), tr("Please provide Name and Command"));
+            continue;
+        }
+        file.setLocalizedValue(QL1S("Name"), trimmedName);
+        file.setValue(QL1S("Exec"), trimmedCommand);
         if (edit.needTray())
             file.setValue(QL1S("X-LXQt-Need-Tray"), true);
         else
             file.removeEntry(QL1S("X-LXQt-Need-Tray"));
+        if (edit.x11Only())
+            file.setValue(QL1S("X-LXQt-X11-Only"), true);
+        else
+            file.removeEntry(QL1S("X-LXQt-X11-Only"));
 
-        mXdgAutoStartModel->setEntry(index, file, true);
+        if (mXdgAutoStartModel->setEntry(index, file, true))
+            success = true;
+        else
+            QMessageBox::critical(this, tr("Error"), tr("File '%1' already exists!").arg(file.fileName()));
     }
 }
 

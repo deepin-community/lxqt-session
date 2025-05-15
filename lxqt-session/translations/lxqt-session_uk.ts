@@ -4,12 +4,12 @@
 <context>
     <name>LXQtModuleManager</name>
     <message>
-        <location filename="../src/lxqtmodman.cpp" line="311"/>
+        <location filename="../src/lxqtmodman.cpp" line="330"/>
         <source>Crash Report</source>
         <translation>Звіт про крах</translation>
     </message>
     <message>
-        <location filename="../src/lxqtmodman.cpp" line="312"/>
+        <location filename="../src/lxqtmodman.cpp" line="331"/>
         <source>&lt;b&gt;%1&lt;/b&gt; crashed too many times. Its autorestart has been disabled until next login.</source>
         <translation>&lt;b&gt;%1&lt;/b&gt; зазнало краху забагато разів. Його авторестарт буде виключено до наступного входу.</translation>
     </message>
@@ -19,18 +19,28 @@
     <message>
         <location filename="../src/main.cpp" line="62"/>
         <source>Configuration file path.</source>
-        <translation type="unfinished"></translation>
+        <translation>Шлях до файлу налаштувань.</translation>
     </message>
     <message>
         <location filename="../src/main.cpp" line="62"/>
         <location filename="../src/main.cpp" line="63"/>
         <source>file</source>
-        <translation type="unfinished"></translation>
+        <translation>файл</translation>
     </message>
     <message>
         <location filename="../src/main.cpp" line="63"/>
         <source>Window manager to use.</source>
-        <translation type="unfinished"></translation>
+        <translation>Використовуваний менеджер вікон.</translation>
+    </message>
+    <message>
+        <location filename="../src/sessionapplication.cpp" line="82"/>
+        <source>DBus Environment</source>
+        <translation>Середовище DBus</translation>
+    </message>
+    <message>
+        <location filename="../src/sessionapplication.cpp" line="83"/>
+        <source>The DBus Activation Environment wasn&apos;t updated. Some apps might not work properly</source>
+        <translation>Середовище активації DBus не було оновлено. Деякі застосунки можуть не працювати належним чином</translation>
     </message>
 </context>
 <context>
@@ -48,7 +58,7 @@
     <message>
         <location filename="../src/wmselectdialog.cpp" line="66"/>
         <source>Choose your favorite one.</source>
-        <translation>Оберіть Ваш улюблений.</translation>
+        <translation>Виберіть свій улюблений.</translation>
     </message>
     <message>
         <location filename="../src/wmselectdialog.ui" line="20"/>
@@ -58,7 +68,7 @@
     <message>
         <location filename="../src/wmselectdialog.ui" line="71"/>
         <source>You will be able to change this at any time through Preferences -&gt; Session Settings -&gt; Basic Settings.</source>
-        <translation>Ви зможете його змінити через Налаштування -&gt; Налаштування сесії -&gt; Базові налаштування.</translation>
+        <translation>Ви зможете його змінити через Налаштування -&gt; Налаштування сеансу -&gt; Базові налаштування.</translation>
     </message>
 </context>
 </TS>

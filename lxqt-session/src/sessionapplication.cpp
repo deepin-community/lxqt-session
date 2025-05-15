@@ -27,10 +27,11 @@
 #include <csignal>
 #include <LXQt/Settings>
 #include <LXQt/Globals>
+#include <QMessageBox>
 #include <QProcess>
+#include <QGuiApplication>
 #include "log.h"
 
-#include <QX11Info>
 // XKB, this should be disabled in Wayland?
 #include <X11/XKBlib.h>
 
@@ -76,39 +77,52 @@ bool SessionApplication::startup()
     qCDebug(SESSION) << __FILE__ << ":" << __LINE__ << "Session" << configName << "about to launch (default 'session')";
 
     loadEnvironmentSettings(settings);
+
+    if (!updateDBusEnvironment()) {
+        QMessageBox::warning(nullptr, tr("DBus Environment"),
+                tr("The DBus Activation Environment wasn't updated. Some apps might not work properly"));
+    }
+
     // loadFontSettings(settings);
-    loadKeyboardSettings(settings);
-    loadMouseSettings(settings);
+
+    bool isX11(QGuiApplication::platformName() == QStringLiteral("xcb"));
+    if (isX11)
+    {
+        loadKeyboardSettings(settings);
+        loadMouseSettings(settings);
 
 #if defined(WITH_LIBUDEV_MONITOR)
-    UdevNotifier * dev_notifier = new UdevNotifier{QStringLiteral("input"), this}; //will be released upon our destruction
-    QTimer * dev_timer = new QTimer{this}; //will be released upon our destruction
-    dev_timer->setSingleShot(true);
-    dev_timer->setInterval(500); //give some time to xorg... we need to reset keyboard afterwards
-    connect(dev_timer, &QTimer::timeout, [this]
-            {
-                //XXX: is this a race? (because settings can be currently changed by lxqt-config-input)
-                //     but with such a little probablity we can live...
-                LXQt::Settings settings(configName);
-                loadKeyboardSettings(settings);
-            });
-    connect(dev_notifier, &UdevNotifier::deviceAdded, [this, dev_timer] (QString device)
-            {
-                qCWarning(SESSION) << QStringLiteral("Session '%1', new input device '%2', keyboard setting will be (optionaly) reloaded...").arg(configName).arg(device);
-                dev_timer->start();
-            });
-    // Detect display connection:
-    // Intel i915 doesn't updates display status properly. The command xrandr must be run to 
-    // update display status or run:
-    // # echo detect > status
-    // at /sys/devices/pciXXX/drm/cardX/cardX-XXX
-    UdevNotifier *dev_notifier_drm_subsystem = new UdevNotifier(QStringLiteral("drm"), this); //will be released upon our destruction
-    connect(dev_notifier_drm_subsystem, &UdevNotifier::deviceChanged, [this] (QString device)
-            {
-                qCWarning(SESSION) << QStringLiteral("Session '%1': display device '%2'").arg(configName).arg(device);
-                QProcess::startDetached(QStringLiteral("lxqt-config-monitor"), QStringList(QStringLiteral("-l")));
-            });
+        UdevNotifier * dev_notifier = new UdevNotifier{QStringLiteral("input"), this}; //will be released upon our destruction
+        QTimer * dev_timer = new QTimer{this}; //will be released upon our destruction
+        dev_timer->setSingleShot(true);
+        dev_timer->setInterval(500); //give some time to xorg... we need to reset keyboard afterwards
+        connect(dev_timer, &QTimer::timeout, this, [this]
+                {
+                    // XXX: is this a race? (because settings can be currently changed by lxqt-config-input)
+                    //      but with such a little probablity we can live...
+                    LXQt::Settings settings(configName);
+                    loadKeyboardSettings(settings);
+                    QProcess::startDetached(QStringLiteral("lxqt-config-input"), QStringList(QStringLiteral("--load-touchpad")));
+                });
+        connect(dev_notifier, &UdevNotifier::deviceAdded, this, [this, dev_timer] (QString device)
+                {
+                    qCWarning(SESSION) << QStringLiteral("Session '%1', new input device '%2', keyboard, mouse and touchpad settings will be (optionally) reloaded...").arg(configName,device);
+                    dev_timer->start();
+                });
+
+        // Detect display connection:
+        // Intel i915 doesn't updates display status properly. The command xrandr must be run to
+        // update display status or run:
+        // # echo detect > status
+        // at /sys/devices/pciXXX/drm/cardX/cardX-XXX
+        UdevNotifier *dev_notifier_drm_subsystem = new UdevNotifier(QStringLiteral("drm"), this); // will be released upon our destruction
+        connect(dev_notifier_drm_subsystem, &UdevNotifier::deviceChanged, this, [this] (QString device)
+                {
+                    qCWarning(SESSION) << QStringLiteral("Session '%1': display device '%2'").arg(configName,device);
+                    QProcess::startDetached(QStringLiteral("lxqt-config-monitor"), QStringList(QStringLiteral("-l")));
+                });
 #endif
+    }
 
     if (lockScreenManager->startup(settings.value(QLatin1String("lock_screen_before_power_actions"), true).toBool()
                 , settings.value(QLatin1String("power_actions_after_lock_delay"), 0).toInt()))
@@ -165,7 +179,7 @@ void SessionApplication::setxkbmap(QString layout, QString variant, QString mode
     }
   }
   if(!options.isEmpty()) {
-    for(const QString& option : qAsConst(options)) {
+    for(const QString& option : std::as_const(options)) {
       args << QStringLiteral("-option");
       args << option;
     }
@@ -177,22 +191,27 @@ void SessionApplication::setxkbmap(QString layout, QString variant, QString mode
 
 void SessionApplication::loadKeyboardSettings(LXQt::Settings& settings)
 {
-  qCDebug(SESSION) << settings.fileName();
+    qCDebug(SESSION) << settings.fileName();
     settings.beginGroup(QSL("Keyboard"));
     XKeyboardControl values;
     /* Keyboard settings */
-    unsigned int delay, interval;
-    if(XkbGetAutoRepeatRate(QX11Info::display(), XkbUseCoreKbd, (unsigned int*) &delay, (unsigned int*) &interval))
-    {
-        delay = settings.value(QSL("delay"), delay).toUInt();
-        interval = settings.value(QSL("interval"), interval).toUInt();
-        XkbSetAutoRepeatRate(QX11Info::display(), XkbUseCoreKbd, delay, interval);
-    }
+    unsigned int delay = 0;
+    unsigned int interval = 0;
+    if (auto x11NativeInterface = qGuiApp->nativeInterface<QNativeInterface::QX11Application>()) {
+        if (Display* dpy = x11NativeInterface->display()) {
+            if(XkbGetAutoRepeatRate(dpy, XkbUseCoreKbd, (unsigned int*) &delay, (unsigned int*) &interval))
+            {
+                delay = settings.value(QSL("delay"), delay).toUInt();
+                interval = settings.value(QSL("interval"), interval).toUInt();
+                XkbSetAutoRepeatRate(dpy, XkbUseCoreKbd, delay, interval);
+            }
 
-    // turn on/off keyboard beep
-    bool beep = settings.value(QSL("beep")).toBool();
-    values.bell_percent = beep ? -1 : 0;
-    XChangeKeyboardControl(QX11Info::display(), KBBellPercent, &values);
+            // turn on/off keyboard beep
+            bool beep = settings.value(QSL("beep")).toBool();
+            values.bell_percent = beep ? -1 : 0;
+            XChangeKeyboardControl(dpy, KBBellPercent, &values);
+        }
+    }
 
     // turn on numlock as needed
     if(settings.value(QSL("numlock")).toBool())
@@ -234,8 +253,13 @@ void SessionApplication::loadMouseSettings(LXQt::Settings& settings)
     // other mouse settings
     int accel_factor = settings.value(QSL("accel_factor")).toInt();
     int accel_threshold = settings.value(QSL("accel_threshold")).toInt();
-    if(accel_factor || accel_threshold)
-        XChangePointerControl(QX11Info::display(), accel_factor != 0, accel_threshold != 0, accel_factor, 10, accel_threshold);
+    if(accel_factor || accel_threshold) {
+        if (auto x11NativeInterface = qGuiApp->nativeInterface<QNativeInterface::QX11Application>()) {
+            if (Display* dpy = x11NativeInterface->display()) {
+                XChangePointerControl(dpy, accel_factor != 0, accel_threshold != 0, accel_factor, 10, accel_threshold);
+            }
+        }
+    }
 
     // left handed mouse?
     bool left_handed = settings.value(QSL("left_handed"), false).toBool();
@@ -286,42 +310,70 @@ void SessionApplication::loadFontSettings(LXQt::Settings& settings)
 #define DEFAULT_PTR_MAP_SIZE 128
 void SessionApplication::setLeftHandedMouse(bool mouse_left_handed)
 {
-    unsigned char *buttons, *more_buttons;
-    int n_buttons, i;
+    unsigned char *buttons = nullptr;
+    unsigned char *more_buttons = nullptr;
+    int n_buttons = 0;
+    int i = 0;
     int idx_1 = 0, idx_3 = 1;
 
-    buttons = (unsigned char*)malloc(DEFAULT_PTR_MAP_SIZE);
-    if (!buttons)
-    {
-        return;
-    }
-    n_buttons = XGetPointerMapping(QX11Info::display(), buttons, DEFAULT_PTR_MAP_SIZE);
-    if (n_buttons > DEFAULT_PTR_MAP_SIZE)
-    {
-        more_buttons = (unsigned char*)realloc(buttons, n_buttons);
-        if (!more_buttons)
-        {
+    if (auto x11NativeInterface = qGuiApp->nativeInterface<QNativeInterface::QX11Application>()) {
+        if (Display* dpy = x11NativeInterface->display()) {
+            buttons = (unsigned char*)malloc(DEFAULT_PTR_MAP_SIZE);
+            if (!buttons)
+            {
+                return;
+            }
+            n_buttons = XGetPointerMapping(dpy, buttons, DEFAULT_PTR_MAP_SIZE);
+            if (n_buttons > DEFAULT_PTR_MAP_SIZE)
+            {
+                more_buttons = (unsigned char*)realloc(buttons, n_buttons);
+                if (!more_buttons)
+                {
+                    free(buttons);
+                    return;
+                }
+                buttons = more_buttons;
+                n_buttons = XGetPointerMapping(dpy, buttons, n_buttons);
+            }
+
+            for (i = 0; i < n_buttons; i++)
+            {
+                if (buttons[i] == 1)
+                    idx_1 = i;
+                else if (buttons[i] == ((n_buttons < 3) ? 2 : 3))
+                    idx_3 = i;
+            }
+
+            if ((mouse_left_handed && idx_1 < idx_3) ||
+                (!mouse_left_handed && idx_1 > idx_3))
+            {
+                buttons[idx_1] = ((n_buttons < 3) ? 2 : 3);
+                buttons[idx_3] = 1;
+                XSetPointerMapping(dpy, buttons, n_buttons);
+            }
             free(buttons);
-            return;
         }
-        buttons = more_buttons;
-        n_buttons = XGetPointerMapping(QX11Info::display(), buttons, n_buttons);
     }
+}
 
-    for (i = 0; i < n_buttons; i++)
-    {
-        if (buttons[i] == 1)
-            idx_1 = i;
-        else if (buttons[i] == ((n_buttons < 3) ? 2 : 3))
-            idx_3 = i;
+bool SessionApplication::updateDBusEnvironment()
+{
+    qCDebug(SESSION) << "Updating DBus activation environment:";
+    QProcess p;
+    p.setProgram(QStringLiteral("dbus-update-activation-environment"));
+    p.setArguments(QStringList(QStringLiteral("--all")));
+    p.start();
+    if (!p.waitForStarted(2000)) {
+        qCWarning(SESSION, "Failed to start dbus-update-activation-environment. It is expected to be in the PATH");
+        return false;
     }
-
-    if ((mouse_left_handed && idx_1 < idx_3) ||
-        (!mouse_left_handed && idx_1 > idx_3))
-    {
-        buttons[idx_1] = ((n_buttons < 3) ? 2 : 3);
-        buttons[idx_3] = 1;
-        XSetPointerMapping(QX11Info::display(), buttons, n_buttons);
+    if (!p.waitForFinished(5000) || p.exitStatus() != QProcess::NormalExit) {
+        qCWarning(SESSION, "dbus-updatee-activation-environment failed: %s", qUtf8Printable(p.errorString()));
+        return false;
     }
-    free(buttons);
+    if (p.exitCode() != 0) {
+        qCWarning(SESSION, "dbus-updatee-activation-environment failed: %s", p.readAllStandardError().constData());
+        return false;
+    }
+    return true;
 }

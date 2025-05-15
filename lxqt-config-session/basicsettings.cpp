@@ -36,6 +36,9 @@ static const QLatin1String windowManagerKey("window_manager");
 static const QLatin1String leaveConfirmationKey("leave_confirmation");
 static const QLatin1String lockBeforePowerActionsKey("lock_screen_before_power_actions");
 static const QLatin1String powerActionsAfterLockDelayKey("power_actions_after_lock_delay");
+static const QLatin1String QtScaleKey("QT_SCALE_FACTOR");
+static const QLatin1String x11LockCommandKey("lock_command");
+static const QLatin1String GdkScaleKey("GDK_SCALE");
 static const QLatin1String openboxValue("openbox");
 
 BasicSettings::BasicSettings(LXQt::Settings *settings, QWidget *parent) :
@@ -45,9 +48,10 @@ BasicSettings::BasicSettings(LXQt::Settings *settings, QWidget *parent) :
     ui(new Ui::BasicSettings)
 {
     ui->setupUi(this);
-    connect(ui->findWmButton, SIGNAL(clicked()), this, SLOT(findWmButton_clicked()));
-    connect(ui->startButton, SIGNAL(clicked()), this, SLOT(startButton_clicked()));
-    connect(ui->stopButton, SIGNAL(clicked()), this, SLOT(stopButton_clicked()));
+    connect(ui->findWmButton, &QPushButton::clicked, this, &BasicSettings::findWmButton_clicked);
+    connect(ui->startButton,  &QPushButton::clicked, this, &BasicSettings::startButton_clicked);
+    connect(ui->stopButton,   &QPushButton::clicked, this, &BasicSettings::stopButton_clicked);
+    connect(ui->findX11LockCommandButton, &QPushButton::clicked, this, &BasicSettings::findX11LockCommandButton_clicked);
     restoreSettings();
 
     ui->moduleView->setModel(m_moduleModel);
@@ -69,6 +73,9 @@ void BasicSettings::restoreSettings()
         knownWMs << wm.command;
     }
 
+    QStringList knownX11Locker;
+    knownX11Locker << QStringLiteral("i3lock") << QStringLiteral("kscreenlocker") << QStringLiteral("slock") << QStringLiteral("xsecurelock") << QStringLiteral("xlock");
+
     QString wm = m_settings->value(windowManagerKey, openboxValue).toString();
     SessionConfigWindow::handleCfgComboBox(ui->wmComboBox, knownWMs, wm);
     m_moduleModel->reset();
@@ -76,6 +83,15 @@ void BasicSettings::restoreSettings()
     ui->leaveConfirmationCheckBox->setChecked(m_settings->value(leaveConfirmationKey, false).toBool());
     ui->lockBeforePowerActionsCheckBox->setChecked(m_settings->value(lockBeforePowerActionsKey, true).toBool());
     ui->powerAfterLockDelaySpinBox->setValue(m_settings->value(powerActionsAfterLockDelayKey, 0).toInt());
+
+    m_settings->beginGroup(QL1S("Environment"));
+    ui->scaleSpinBox->setValue(m_settings->value(QtScaleKey, 1.0).toDouble());
+    m_settings->endGroup();
+
+    QString x11LockCommand = m_settings->value(x11LockCommandKey, QString()).toString();
+    SessionConfigWindow::handleCfgComboBox(ui->x11LockCommandComboBox, knownX11Locker, x11LockCommand);
+
+    ui->customLockBox->setChecked(!x11LockCommand.isEmpty());
 }
 
 void BasicSettings::save()
@@ -90,6 +106,9 @@ void BasicSettings::save()
     const bool leaveConfirmation = ui->leaveConfirmationCheckBox->isChecked();
     const bool lockBeforePowerActions = ui->lockBeforePowerActionsCheckBox->isChecked();
     const int powerAfterLockDelay = ui->powerAfterLockDelaySpinBox->value();
+    const double scaleFactor = ui->scaleSpinBox->value();
+    const QString x11LockCommand = ui->customLockBox->isChecked() ? ui->x11LockCommandComboBox->currentText()
+                                                                  : QString();
 
     QMap<QString, AutostartItem> previousItems(AutostartItem::createItemMap());
     QMutableMapIterator<QString, AutostartItem> i(previousItems);
@@ -125,6 +144,28 @@ void BasicSettings::save()
         doRestart = true;
     }
 
+    if (x11LockCommand != m_settings->value(x11LockCommandKey, QString()).toString())
+    {
+        if (x11LockCommand.isEmpty())
+            m_settings->remove(x11LockCommandKey);
+        else
+            m_settings->setValue(x11LockCommandKey, x11LockCommand);
+        doRestart = true;
+    }
+
+    bool scaleChanged = false;
+    m_settings->beginGroup(QL1S("Environment"));
+    if (scaleFactor != m_settings->value(QtScaleKey, 1.0).toDouble()
+        || scaleFactor != m_settings->value(GdkScaleKey, 1.0).toDouble())
+    {
+        m_settings->setValue(QtScaleKey, scaleFactor);
+        m_settings->setValue(GdkScaleKey, scaleFactor);
+        scaleChanged = true;
+    }
+    m_settings->endGroup();
+    if (scaleChanged)
+        emit scaleFactorChanged(); // will update EnvironmentPage in SessionConfigWindow
+
     QMap<QString, AutostartItem> currentItems = m_moduleModel->items();
     QMap<QString, AutostartItem>::const_iterator k = currentItems.constBegin();
     while (k != currentItems.constEnd())
@@ -145,7 +186,7 @@ void BasicSettings::save()
         ++k;
     }
 
-    if (doRestart)
+    if (doRestart || scaleChanged)
         emit needRestart();
 
     m_moduleModel->writeChanges();
@@ -164,4 +205,9 @@ void BasicSettings::startButton_clicked()
 void BasicSettings::stopButton_clicked()
 {
     m_moduleModel->toggleModule(ui->moduleView->selectionModel()->currentIndex(), false);
+}
+
+void BasicSettings::findX11LockCommandButton_clicked()
+{
+    SessionConfigWindow::updateCfgComboBox(ui->x11LockCommandComboBox, tr("Select a screenlocker"));
 }

@@ -4,12 +4,12 @@
 <context>
     <name>LXQtModuleManager</name>
     <message>
-        <location filename="../src/lxqtmodman.cpp" line="311"/>
+        <location filename="../src/lxqtmodman.cpp" line="330"/>
         <source>Crash Report</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/lxqtmodman.cpp" line="312"/>
+        <location filename="../src/lxqtmodman.cpp" line="331"/>
         <source>&lt;b&gt;%1&lt;/b&gt; crashed too many times. Its autorestart has been disabled until next login.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -19,17 +19,27 @@
     <message>
         <location filename="../src/main.cpp" line="62"/>
         <source>Configuration file path.</source>
-        <translation type="unfinished"></translation>
+        <translation>Путања конфигурационг фајла.</translation>
     </message>
     <message>
         <location filename="../src/main.cpp" line="62"/>
         <location filename="../src/main.cpp" line="63"/>
         <source>file</source>
-        <translation type="unfinished"></translation>
+        <translation>фајл</translation>
     </message>
     <message>
         <location filename="../src/main.cpp" line="63"/>
         <source>Window manager to use.</source>
+        <translation>Менаџер прозора за коришћење.</translation>
+    </message>
+    <message>
+        <location filename="../src/sessionapplication.cpp" line="82"/>
+        <source>DBus Environment</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/sessionapplication.cpp" line="83"/>
+        <source>The DBus Activation Environment wasn&apos;t updated. Some apps might not work properly</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -43,22 +53,22 @@
     <message>
         <location filename="../src/wmselectdialog.cpp" line="65"/>
         <source>Other ...</source>
-        <translation type="unfinished"></translation>
+        <translation>Остало ...</translation>
     </message>
     <message>
         <location filename="../src/wmselectdialog.cpp" line="66"/>
         <source>Choose your favorite one.</source>
-        <translation type="unfinished"></translation>
+        <translation>Изабери свој омиљени.</translation>
     </message>
     <message>
         <location filename="../src/wmselectdialog.ui" line="20"/>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Welcome to LXQt&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Please select your default Window Manager.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation type="unfinished"></translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Добродошли у Рејзор-кјут&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Изаберите свој подразумевани менаџер прозора.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <location filename="../src/wmselectdialog.ui" line="71"/>
         <source>You will be able to change this at any time through Preferences -&gt; Session Settings -&gt; Basic Settings.</source>
-        <translation type="unfinished"></translation>
+        <translation>Моћи ћете да ово промените у било које време кроз Поставке -&gt; Поставке сесије -&gt; Основна подешавања.</translation>
     </message>
 </context>
 </TS>

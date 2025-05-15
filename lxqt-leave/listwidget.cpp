@@ -33,7 +33,7 @@
 /*!
  * This private delegate does:
  * - returns unified sizeHint() -> maximum of all items in (list) model
- * - cahes the sizeHint() to not iterate over all items and checking their size
+ * - caches the sizeHint() to not iterate over all items and checking their size
  * - overrides decoration position to Qt::Top
  * - gives the items margins (increasing sizeHint()) ~~and mimics Button visual~~
  * - overrides painting the focus around the whole item (with the decoration)
@@ -165,7 +165,7 @@ QModelIndex ListWidget::moveCursor(CursorAction cursorAction, Qt::KeyboardModifi
     // if not enabled, try to find any next enabled
     for (int tries = 1; tries < count && 0 == (model()->flags(index) & Qt::ItemIsEnabled); ++tries)
     {
-        int next;
+        int next = 0;
         switch (cursorAction)
         {
             case MoveUp:

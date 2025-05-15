@@ -55,7 +55,7 @@ AutoStartItemModel::~AutoStartItemModel()
 }
 
 /*
- * All actual file operations are perfomed here when the window is closed.
+ * All actual file operations are performed here when the window is closed.
  */
 bool AutoStartItemModel::writeChanges()
 {
@@ -68,10 +68,10 @@ QMap<QString, AutostartItem> AutoStartItemModel::items()
 {
     QMap<QString, AutostartItem> allItems;
 
-    for(const QString &s : qAsConst(mLXQtItems))
+    for(const QString &s : std::as_const(mLXQtItems))
         allItems[s] = mItemMap.value(s);
 
-    for(const QString &s : qAsConst(mGlobalItems))
+    for(const QString &s : std::as_const(mGlobalItems))
         allItems[s] = mItemMap.value(s);
 
     return allItems;
@@ -150,8 +150,8 @@ bool AutoStartItemModel::removeRow(int row, const QModelIndex& parent)
 
     if (!mItemMap[item].removeLocal())
     {
-        QModelIndex index = parent.child(row, 0);
-        emit dataChanged(index, index);
+        QModelIndex indx = index(row, 0, parent);
+        emit dataChanged(indx, indx);
         return false;
     }
 
@@ -239,7 +239,7 @@ Qt::ItemFlags AutoStartItemModel::flags(const QModelIndex& index) const
 }
 
 /*
- * Controls which buttons are enabled/disabled based on the selecton.
+ * Controls which buttons are enabled/disabled based on the selection.
  */
 AutoStartItemModel::ActiveButtons AutoStartItemModel::activeButtons(const QModelIndex& selection) const
 {

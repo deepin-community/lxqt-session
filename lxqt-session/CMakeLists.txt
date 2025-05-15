@@ -9,6 +9,11 @@ endif()
 include_directories(
     ${X11_INCLUDE_DIR}
 )
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    include_directories(
+        ${PROCPS_INCLUDE_DIRS}
+    )
+endif()
 
 set(lxqt-session_HDRS "")
 
@@ -24,6 +29,7 @@ set(lxqt-session_SRCS
     src/numlock.cpp
     src/numlock.h
     src/log.cpp
+    src/procreaper.cpp
 )
 if (WITH_LIBUDEV)
     list(APPEND lxqt-session_SRCS src/UdevNotifier.cpp)
@@ -54,13 +60,25 @@ add_executable(lxqt-session
 )
 
 target_link_libraries(lxqt-session
-    Qt5::Widgets
-    Qt5::DBus
-    Qt5::X11Extras
+    Qt6::Widgets
+    Qt6::DBus
     lxqt
     ${X11_LIBRARIES}
-    KF5::WindowSystem
+    KF6::WindowSystem
 )
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_libraries(lxqt-session
+        ${PROCPS_LIBRARIES}
+    )
+elseif (CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+    target_link_libraries(lxqt-session
+        -lutil
+    )
+elseif (CMAKE_SYSTEM_NAME STREQUAL "NetBSD")
+    target_link_libraries(lxqt-session
+        -lkvm
+    )
+endif()
 
 if (WITH_LIBUDEV)
     target_link_libraries(lxqt-session ${UDEV_LIBS})

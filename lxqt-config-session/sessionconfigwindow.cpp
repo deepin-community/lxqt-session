@@ -4,7 +4,7 @@
  * LXQt - a lightweight, Qt based, desktop toolset
  * https://lxqt.org/
  *
- * Copyright: 2010-2011 LXQt team
+ * Copyright: 2010-2024 LXQt team
  * Authors:
  *   Petr Vanek <petr@scribus.info>
  *
@@ -28,6 +28,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QFileDialog>
+#include <QStandardPaths>
 
 #include <LXQt/Globals>
 #include <LXQt/Settings>
@@ -36,40 +37,52 @@
 #include "../lxqt-session/src/windowmanager.h"
 #include "basicsettings.h"
 #include "autostartpage.h"
+#include "waylandsettings.h"
 #include "environmentpage.h"
 #include "userlocationspage.h"
-
 
 SessionConfigWindow::SessionConfigWindow() :
       LXQt::ConfigDialog(tr("LXQt Session Settings"), new LXQt::Settings(QSL("session")), nullptr)
 {
     BasicSettings* basicSettings = new BasicSettings(mSettings, this);
     addPage(basicSettings, tr("Basic Settings"), QSL("preferences-desktop-display-color"));
-    connect(basicSettings, SIGNAL(needRestart()), SLOT(setRestart()));
-    connect(this, SIGNAL(reset()), basicSettings, SLOT(restoreSettings()));
-    connect(this, SIGNAL(save()), basicSettings, SLOT(save()));
+    connect(basicSettings, &BasicSettings::needRestart, this, &SessionConfigWindow::setRestart);
+    connect(this, &SessionConfigWindow::reset, basicSettings, &BasicSettings::restoreSettings);
+    connect(this, &SessionConfigWindow::save,  basicSettings, &BasicSettings::save);
 
     UserLocationsPage* userLocations = new UserLocationsPage(this);
     addPage(userLocations, tr("User Directories"), QStringLiteral("folder"));
-    connect(userLocations, SIGNAL(needRestart()), SLOT(setRestart()));
-    connect(this, SIGNAL(reset()), userLocations, SLOT(restoreSettings()));
-    connect(this, SIGNAL(save()), userLocations, SLOT(save()));
+    connect(userLocations, &UserLocationsPage::needRestart, this, &SessionConfigWindow::setRestart);
+    connect(this, &SessionConfigWindow::reset, userLocations, &UserLocationsPage::restoreSettings);
+    connect(this, &SessionConfigWindow::save,  userLocations, &UserLocationsPage::save);
 
     AutoStartPage* autoStart = new AutoStartPage(this);
     addPage(autoStart, tr("Autostart"), QSL("preferences-desktop-launch-feedback"));
-    connect(autoStart, SIGNAL(needRestart()), SLOT(setRestart()));
-    connect(this, SIGNAL(reset()), autoStart, SLOT(restoreSettings()));
-    connect(this, SIGNAL(save()), autoStart, SLOT(save()));
+    connect(autoStart, &AutoStartPage::needRestart, this, &SessionConfigWindow::setRestart);
+    connect(this, &SessionConfigWindow::reset, autoStart, &AutoStartPage::restoreSettings);
+    connect(this, &SessionConfigWindow::save, autoStart, &AutoStartPage::save);
+
+    if (!QStandardPaths::findExecutable(QLatin1String("startlxqtwayland")).isEmpty()) {
+        WaylandSettings* waylandSettings = new WaylandSettings(mSettings, this);
+        addPage(waylandSettings, tr("Wayland Settings (Experimental)"), QSL("wayland"));
+        connect(waylandSettings, &WaylandSettings::needRestart, this, &SessionConfigWindow::setRestart);
+        connect(this, &SessionConfigWindow::reset, waylandSettings, &WaylandSettings::restoreSettings);
+        connect(this, &SessionConfigWindow::save,  waylandSettings, &WaylandSettings::save);
+    }
 
     EnvironmentPage* environmentPage = new EnvironmentPage(mSettings, this);
     addPage(environmentPage, tr("Environment (Advanced)"), QSL("preferences-system-session-services"));
-    connect(environmentPage, SIGNAL(needRestart()), SLOT(setRestart()));
-    connect(this, SIGNAL(reset()), environmentPage, SLOT(restoreSettings()));
-    connect(this, SIGNAL(save()), environmentPage, SLOT(save()));
+    connect(environmentPage, &EnvironmentPage::needRestart, this, &SessionConfigWindow::setRestart);
+    connect(this, &SessionConfigWindow::reset, environmentPage, &EnvironmentPage::restoreSettings);
+    connect(this, &SessionConfigWindow::save,  environmentPage, &EnvironmentPage::save);
+
+    // Update EnvironmentPage on changing scale factor; otherwise, scale factor will not change
+    // because "EnvironmentPage::save()" overwrites EVs.
+    connect(basicSettings, &BasicSettings::scaleFactorChanged, environmentPage, &EnvironmentPage::updateScaleFactor);
 
     // sync Default Apps and Environment
     environmentPage->restoreSettings();
-    connect(this, SIGNAL(reset()), SLOT(clearRestart()));
+    connect(this, &SessionConfigWindow::reset, this, &SessionConfigWindow::clearRestart);
     m_restart = false;
 
     adjustSize();

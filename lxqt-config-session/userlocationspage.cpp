@@ -130,15 +130,14 @@ UserLocationsPage::UserLocationsPage(QWidget *parent)
 
         QToolButton *button = new QToolButton(this);
         button->setIcon(XdgIcon::fromTheme(QStringLiteral("folder")));
-        connect(button, SIGNAL(clicked()), d->signalMapper, SLOT(map()));
+        connect(button, &QToolButton::clicked, d->signalMapper, QOverload<>::of(&QSignalMapper::map));
         d->signalMapper->setMapping(button, i);
 
         gridLayout->addWidget(label, row, 0);
         gridLayout->addWidget(edit, row, 1);
         gridLayout->addWidget(button, row, 2);
     }
-    connect(d->signalMapper, SIGNAL(mapped(int)),
-            this, SLOT(clicked(int)));
+    connect(d->signalMapper, &QSignalMapper::mappedInt, this, &UserLocationsPage::clicked);
 
     QSpacerItem *verticalSpacer = new QSpacerItem(20, 40, QSizePolicy::Minimum,
                                                   QSizePolicy::Expanding);
@@ -183,7 +182,7 @@ void UserLocationsPage::save()
             if (!ok) {
                 const int ret = QMessageBox::warning(this,
                     tr("LXQt Session Settings - User Directories"),
-                    tr("An error ocurred while applying the settings for the %1 location").arg(QCoreApplication::translate("UserLocationsPrivate", d->locationsName[i])),
+                    tr("An error occurred while applying the settings for the %1 location").arg(QCoreApplication::translate("UserLocationsPrivate", d->locationsName[i])),
                     QMessageBox::Ok);
                 Q_UNUSED(ret);
             }

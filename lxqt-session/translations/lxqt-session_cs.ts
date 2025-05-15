@@ -4,14 +4,14 @@
 <context>
     <name>LXQtModuleManager</name>
     <message>
-        <location filename="../src/lxqtmodman.cpp" line="311"/>
+        <location filename="../src/lxqtmodman.cpp" line="330"/>
         <source>Crash Report</source>
         <translation>Zpráva o pádu</translation>
     </message>
     <message>
-        <location filename="../src/lxqtmodman.cpp" line="312"/>
+        <location filename="../src/lxqtmodman.cpp" line="331"/>
         <source>&lt;b&gt;%1&lt;/b&gt; crashed too many times. Its autorestart has been disabled until next login.</source>
-        <translation>&lt;b&gt;%1&lt;/b&gt; zhavarovalo příliš hodněkrát. Automatické opětovné spuštění proto bylo vypnuto až do příštího přihlášení.</translation>
+        <translation>&lt;b&gt;%1&lt;/b&gt; zhavarovalo příliš mnohokrát. Automatické opětovné spuštění proto bylo vypnuto až do příštího přihlášení.</translation>
     </message>
 </context>
 <context>
@@ -31,6 +31,16 @@
         <location filename="../src/main.cpp" line="63"/>
         <source>Window manager to use.</source>
         <translation>Správce oken který použít.</translation>
+    </message>
+    <message>
+        <location filename="../src/sessionapplication.cpp" line="82"/>
+        <source>DBus Environment</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/sessionapplication.cpp" line="83"/>
+        <source>The DBus Activation Environment wasn&apos;t updated. Some apps might not work properly</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -58,7 +68,7 @@
     <message>
         <location filename="../src/wmselectdialog.ui" line="71"/>
         <source>You will be able to change this at any time through Preferences -&gt; Session Settings -&gt; Basic Settings.</source>
-        <translation>Toto pak budete moci kdykoli změnit přes Nastavení → Nastavení sezení → Základní nastavení.</translation>
+        <translation>Toto pak budete moci kdykoli změnit prostřednictvím Nastavení → Nastavení sezení → Základní nastavení.</translation>
     </message>
 </context>
 </TS>
